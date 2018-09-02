@@ -4,10 +4,10 @@
 # Magisk Boot Image Patcher
 # by topjohnwu
 #
-# Usage: sh boot_patch.sh <bootimage>
+# Usage: boot_patch.sh <bootimage>
 #
-# The following additional flags can be set in environment variables:
-# KEEPVERITY, KEEPFORCEENCRYPT, HIGHCOMP
+# The following flags can be set in environment variables:
+# KEEPVERITY, KEEPFORCEENCRYPT
 #
 # This script should be placed in a directory with the following files:
 #
@@ -55,9 +55,6 @@ fi
 BOOTIMAGE="$1"
 [ -e "$BOOTIMAGE" ] || abort "$BOOTIMAGE does not exist!"
 
-# Flags
-HIGHCOMP=false
-
 chmod -R 755 .
 
 # Extract magisk if doesn't exist
@@ -77,17 +74,14 @@ case $? in
     abort "! Unable to unpack boot image"
     ;;
   2 )
-    HIGHCOMP=true
-    ;;
-  3 )
     ui_print "- ChromeOS boot image detected"
     CHROMEOS=true
     ;;
-  4 )
+  3 )
     ui_print "! Sony ELF32 format detected"
     abort "! Please use BootBridge from @AdrianDC to flash Magisk"
     ;;
-  5 )
+  4 )
     ui_print "! Sony ELF64 format detected"
     abort "! Stock kernel cannot be patched, please use a custom kernel"
 esac
@@ -111,30 +105,6 @@ if [ $(grep_prop ro.build.version.sdk) -ge 26 ]; then
       s/quota\b//g
     " "$i"
   done
-fi
-
-##########################################################################################
-# Ramdisk restores
-##########################################################################################
-
-# Test patch status and do restore, after this section, ramdisk.cpio.orig is guaranteed to exist
-ui_print "- Checking ramdisk status"
-MAGISK_PATCHED=false
-./magiskboot --cpio ramdisk.cpio test
-case $? in
-  0 )  # Stock boot
-    ;;
-  1 )  # Magisk patched
-    HIGHCOMP=false
-    ;;
-  2 ) # High compression mode
-    HIGHCOMP=true
-    ;;
-esac
-
-if $HIGHCOMP; then
-  ui_print "! Insufficient boot partition size detected"
-  ui_print "- Enable high compression mode"
 fi
 
 ##########################################################################################
@@ -170,6 +140,16 @@ if [ -f kernel ]; then
   ./magiskboot --hexpatch kernel \
   49010054011440B93FA00F71E9000054010840B93FA00F7189000054001840B91FA00F7188010054 \
   A1020054011440B93FA00F7140020054010840B93FA00F71E0010054001840B91FA00F7181010054
+
+  # Remove Samsung defex (A8 variant)
+  ./magiskboot --hexpatch kernel \
+  006044B91F040071802F005460DE41F9 \
+  006044B91F00006B802F005460DE41F9
+
+  # Remove Samsung defex (N9 variant)
+  ./magiskboot --hexpatch kernel \
+  603A46B91F0400710030005460C642F9 \
+  603A46B91F00006B0030005460C642F9
 
   # skip_initramfs -> want_initramfs
   ./magiskboot --hexpatch kernel \
